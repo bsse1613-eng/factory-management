@@ -1,0 +1,700 @@
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../services/supabaseClient';
+import { Profile, Delivery, DeliveryPayment } from '../types';
+import { Plus, Printer, Wallet, X, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { generateDeliveryPDF, printDeliveryPDF } from '../services/pdfService';
+import { mockDeliveries, mockDeliveryPayments } from '../services/mockData';
+
+// Branch color scheme
+const getBranchColor = (branch?: string) => {
+  if (branch === 'Bogura') return { bg: 'bg-blue-100', text: 'text-blue-700', badge: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700' };
+  if (branch === 'Santahar') return { bg: 'bg-purple-100', text: 'text-purple-700', badge: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700' };
+  return { bg: 'bg-gray-100', text: 'text-gray-700', badge: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700' };
+};
+
+const BranchBadge = ({ branch }: { branch?: string }) => {
+  const colors = getBranchColor(branch);
+  const dotColor = branch === 'Bogura' ? 'bg-blue-500' : branch === 'Santahar' ? 'bg-purple-500' : 'bg-gray-400';
+  return (
+    <span className={colors.badge}>
+      <span className={`w-2 h-2 rounded-full mr-1.5 ${dotColor}`}></span>
+      {branch || 'Unknown'}
+    </span>
+  );
+};
+
+interface Props {
+  userProfile: Profile;
+}
+
+const Deliveries: React.FC<Props> = ({ userProfile }) => {
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Expandable Row State
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [expandedPayments, setExpandedPayments] = useState<DeliveryPayment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+
+  // Payment Modal State
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<DeliveryPayment[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [newPaymentAmount, setNewPaymentAmount] = useState('');
+  const [newPaymentNotes, setNewPaymentNotes] = useState('');
+  const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    delivery_date: new Date().toISOString().split('T')[0],
+    customer_name: '',
+    customer_address: '',
+    customer_mobile: '',
+    driver_name: '',
+    truck_number: '',
+    product_name: '',
+    number_of_bags: '',
+    price_per_bag: '',
+    product_paid_amount: '',
+    driver_payment_amount: '',
+    driver_extra_cost: '',
+    driver_notes: ''
+  });
+
+  useEffect(() => {
+    fetchDeliveries();
+  }, [userProfile]);
+
+  const fetchDeliveries = async () => {
+    if (userProfile.id === 'demo') {
+        setDeliveries(mockDeliveries);
+        return;
+    }
+
+    let query = supabase
+        .from('deliveries')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+    
+    // Filter by branch for employees
+    if (userProfile.role === 'employee' && userProfile.branch) {
+        query = query.eq('branch', userProfile.branch);
+    }
+    
+    const { data, error } = await query;
+    if (!error && data) setDeliveries(data as unknown as Delivery[]);
+  };
+
+  const toggleRow = async (id: string) => {
+    if (expandedRow === id) {
+        setExpandedRow(null);
+        setExpandedPayments([]);
+        return;
+    }
+    
+    setExpandedRow(id);
+    setLoadingPayments(true);
+
+    if (userProfile.id === 'demo') {
+        const demoPayments = mockDeliveryPayments.filter(p => p.delivery_id === id);
+        setExpandedPayments(demoPayments);
+        setLoadingPayments(false);
+        return;
+    }
+
+    const { data } = await supabase
+        .from('delivery_payments')
+        .select('*')
+        .eq('delivery_id', id)
+        .order('date', { ascending: true });
+    
+    setExpandedPayments(data as unknown as DeliveryPayment[] || []);
+    setLoadingPayments(false);
+  };
+
+  const handlePrint = async (delivery: Delivery) => {
+    let payments: DeliveryPayment[] = [];
+    if (userProfile.id === 'demo') {
+        payments = mockDeliveryPayments.filter(p => p.delivery_id === delivery.id);
+    } else {
+        const { data } = await supabase
+            .from('delivery_payments')
+            .select('*')
+            .eq('delivery_id', delivery.id)
+            .order('date', { ascending: true });
+        payments = (data as unknown as DeliveryPayment[]) || [];
+    }
+    
+    generateDeliveryPDF(delivery, payments);
+  };
+
+  const handleDirectPrint = async (delivery: Delivery) => {
+    let payments: DeliveryPayment[] = [];
+    if (userProfile.id === 'demo') {
+        payments = mockDeliveryPayments.filter(p => p.delivery_id === delivery.id);
+    } else {
+        const { data } = await supabase
+            .from('delivery_payments')
+            .select('*')
+            .eq('delivery_id', delivery.id)
+            .order('date', { ascending: true });
+        payments = (data as unknown as DeliveryPayment[]) || [];
+    }
+    
+    printDeliveryPDF(delivery, payments);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const productPaid = Number(formData.product_paid_amount);
+    const bags = Number(formData.number_of_bags);
+    const price = Number(formData.price_per_bag);
+    const total = bags * price;
+    const due = total - productPaid;
+    const driverTotal = Number(formData.driver_payment_amount) + Number(formData.driver_extra_cost);
+
+    if (userProfile.id === 'demo') {
+        // Simulation
+        const newDelivery: Delivery = {
+            id: `demo-d-${Date.now()}`,
+            created_at: new Date().toISOString(),
+            delivery_date: formData.delivery_date,
+            branch: userProfile.branch || 'Bogura',
+            customer_name: formData.customer_name,
+            customer_address: formData.customer_address,
+            customer_mobile: formData.customer_mobile,
+            driver_name: formData.driver_name,
+            truck_number: formData.truck_number,
+            product_name: formData.product_name,
+            number_of_bags: bags,
+            price_per_bag: price,
+            total_product_price: total,
+            product_paid_amount: productPaid,
+            product_due_amount: due,
+            driver_payment_amount: Number(formData.driver_payment_amount),
+            driver_extra_cost: Number(formData.driver_extra_cost),
+            driver_total_cost: driverTotal,
+            driver_notes: formData.driver_notes
+        };
+        setDeliveries([newDelivery, ...deliveries]);
+        setShowModal(false);
+        setFormData({
+            delivery_date: new Date().toISOString().split('T')[0],
+            customer_name: '',
+            customer_address: '',
+            customer_mobile: '',
+            driver_name: '',
+            truck_number: '',
+            product_name: '',
+            number_of_bags: '',
+            price_per_bag: '',
+            product_paid_amount: '',
+            driver_payment_amount: '',
+            driver_extra_cost: '',
+            driver_notes: ''
+        });
+        setLoading(false);
+        return;
+    }
+
+    const { data, error } = await supabase.from('deliveries').insert([{
+        delivery_date: formData.delivery_date,
+        branch: userProfile.branch || 'Bogura', 
+        customer_name: formData.customer_name,
+        customer_address: formData.customer_address,
+        customer_mobile: formData.customer_mobile,
+        driver_name: formData.driver_name,
+        truck_number: formData.truck_number,
+        product_name: formData.product_name,
+        number_of_bags: bags,
+        price_per_bag: price,
+        total_product_price: total,
+        product_paid_amount: productPaid,
+        driver_payment_amount: Number(formData.driver_payment_amount),
+        driver_extra_cost: Number(formData.driver_extra_cost),
+        driver_notes: formData.driver_notes
+    }]).select().single();
+
+    if (!error && data) {
+        if (productPaid > 0) {
+            await supabase.from('delivery_payments').insert([{
+                delivery_id: data.id,
+                date: formData.delivery_date,
+                amount: productPaid,
+                notes: 'Initial Payment'
+            }]);
+        }
+
+        setDeliveries([data as unknown as Delivery, ...deliveries]);
+        setShowModal(false);
+        setFormData({
+            delivery_date: new Date().toISOString().split('T')[0],
+            customer_name: '',
+            customer_address: '',
+            customer_mobile: '',
+            driver_name: '',
+            truck_number: '',
+            number_of_bags: '',
+            price_per_bag: '',
+            product_paid_amount: '',
+            driver_payment_amount: '',
+            driver_extra_cost: '',
+            driver_notes: ''
+        });
+    } else {
+        alert('Error: ' + error?.message);
+    }
+    setLoading(false);
+  };
+
+  const openPaymentModal = async (delivery: Delivery) => {
+    setSelectedDelivery(delivery);
+    setShowPaymentModal(true);
+    setNewPaymentAmount('');
+    setNewPaymentNotes('');
+    
+    if (userProfile.id === 'demo') {
+        const demoHistory = mockDeliveryPayments.filter(p => p.delivery_id === delivery.id);
+        setPaymentHistory(demoHistory);
+        return;
+    }
+
+    const { data } = await supabase
+        .from('delivery_payments')
+        .select('*')
+        .eq('delivery_id', delivery.id)
+        .order('date', { ascending: true });
+        
+    setPaymentHistory(data as unknown as DeliveryPayment[] || []);
+  };
+
+  const handleAddPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDelivery) return;
+
+    const amount = Number(newPaymentAmount);
+    if (amount <= 0) return;
+
+    setLoading(true);
+
+    if (userProfile.id === 'demo') {
+        // Simulation
+        const newTotalPaid = selectedDelivery.product_paid_amount + amount;
+        const newDue = selectedDelivery.total_product_price - newTotalPaid;
+
+        const updatedDelivery = { ...selectedDelivery, product_paid_amount: newTotalPaid, product_due_amount: newDue };
+        const updatedList = deliveries.map(d => d.id === selectedDelivery.id ? updatedDelivery : d);
+        
+        setDeliveries(updatedList);
+        setSelectedDelivery(updatedDelivery);
+        
+        const newHistoryItem: any = { 
+            id: `dpay-${Date.now()}`, 
+            delivery_id: selectedDelivery.id, 
+            date: newPaymentDate, 
+            amount: amount, 
+            notes: newPaymentNotes || 'Customer Partial Payment' 
+        };
+        setPaymentHistory([...paymentHistory, newHistoryItem]);
+        setNewPaymentAmount('');
+        setNewPaymentNotes('');
+
+         // Also update expanded view if it's open
+        if (expandedRow === selectedDelivery.id) {
+            setExpandedPayments([...expandedPayments, newHistoryItem]);
+        }
+        setLoading(false);
+        return;
+    }
+
+    const { error: payError } = await supabase.from('delivery_payments').insert([{
+        delivery_id: selectedDelivery.id,
+        date: newPaymentDate,
+        amount: amount,
+        notes: newPaymentNotes || 'Customer Partial Payment'
+    }]);
+
+    if (!payError) {
+        const newTotalPaid = selectedDelivery.product_paid_amount + amount;
+        
+        const { data: updatedDelivery, error: updateError } = await supabase
+            .from('deliveries')
+            .update({ product_paid_amount: newTotalPaid })
+            .eq('id', selectedDelivery.id)
+            .select()
+            .single();
+
+        if (!updateError && updatedDelivery) {
+            const updatedList = deliveries.map(d => d.id === selectedDelivery.id ? (updatedDelivery as unknown as Delivery) : d);
+            setDeliveries(updatedList);
+            setSelectedDelivery(updatedDelivery as unknown as Delivery);
+            
+            const newHistoryItem: any = { 
+                id: 'temp', 
+                delivery_id: selectedDelivery.id, 
+                date: newPaymentDate, 
+                amount: amount, 
+                notes: newPaymentNotes || 'Customer Partial Payment' 
+            };
+            setPaymentHistory([...paymentHistory, newHistoryItem]);
+            setNewPaymentAmount('');
+            setNewPaymentNotes('');
+
+             // Also update expanded view if it's open
+            if (expandedRow === selectedDelivery.id) {
+                setExpandedPayments([...expandedPayments, newHistoryItem]);
+            }
+        }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">Sales & Delivery</h1>
+        <button 
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+        >
+            <Plus size={18} /> New Delivery
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-gray-600">
+                <thead className="bg-gray-50 text-gray-700 font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th className="px-6 py-4 w-10"></th>
+                        <th className="px-6 py-4">Branch</th>
+                        <th className="px-6 py-4">Date</th>
+                        <th className="px-6 py-4">Customer</th>
+                        <th className="px-6 py-4">Goods</th>
+                        <th className="px-6 py-4">Amount</th>
+                        <th className="px-6 py-4">Cust. Due</th>
+                        <th className="px-6 py-4">Driver Cost</th>
+                        <th className="px-6 py-4">Action</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {deliveries.map((item) => (
+                        <React.Fragment key={item.id}>
+                            <tr className={`hover:bg-gray-50 transition-colors ${expandedRow === item.id ? getBranchColor(item.branch).bg : ''}`}>
+                                <td className="px-6 py-4 text-center">
+                                    <button 
+                                        onClick={() => toggleRow(item.id)}
+                                        className="text-gray-400 hover:text-green-600 focus:outline-none"
+                                    >
+                                        {expandedRow === item.id ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
+                                    </button>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <BranchBadge branch={item.branch} />
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">{item.delivery_date}</td>
+                                <td className="px-6 py-4">
+                                    <div className="font-medium text-gray-900">{item.customer_name}</div>
+                                    <div className="text-xs text-gray-400">{item.customer_mobile}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    {item.number_of_bags} Bags <br/>
+                                    <span className="text-xs text-gray-400">@{item.price_per_bag}</span>
+                                </td>
+                                <td className="px-6 py-4">৳ {item.total_product_price.toLocaleString()}</td>
+                                <td className="px-6 py-4 text-red-500 font-semibold">৳ {item.product_due_amount.toLocaleString()}</td>
+                                <td className="px-6 py-4">
+                                    <div className="text-gray-900">৳ {item.driver_total_cost.toLocaleString()}</div>
+                                    <div className="text-xs text-gray-400">{item.truck_number}</div>
+                                </td>
+                                <td className="px-6 py-4 flex items-center space-x-3">
+                                    <button 
+                                        onClick={() => openPaymentModal(item)}
+                                        className="text-green-600 hover:text-green-800 transition flex items-center gap-1 bg-green-50 px-2 py-1 rounded"
+                                        title="Receive Payment"
+                                    >
+                                        <Wallet size={16} /> Pay
+                                    </button>
+                                    <button 
+                                        onClick={() => handlePrint(item)}
+                                        className="text-blue-600 hover:text-blue-800 transition flex items-center gap-1 bg-blue-50 px-2 py-1 rounded text-xs font-medium"
+                                        title="Download PDF"
+                                    >
+                                        <Download size={16} /> Download
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDirectPrint(item)}
+                                        className="text-gray-700 hover:text-gray-900 transition flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-xs font-medium"
+                                        title="Direct Print"
+                                    >
+                                        <Printer size={16} /> Print
+                                    </button>
+                                </td>
+                            </tr>
+                            {/* Expanded Row for History */}
+                            {expandedRow === item.id && (
+                                <tr className="bg-gray-50">
+                                    <td colSpan={8} className="px-6 py-4">
+                                        <div className="ml-8 border-l-2 border-green-200 pl-4">
+                                            <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Transaction History</h4>
+                                            {loadingPayments ? (
+                                                <div className="text-sm text-gray-400">Loading details...</div>
+                                            ) : expandedPayments.length === 0 ? (
+                                                <div className="text-sm text-gray-400">No payment history found.</div>
+                                            ) : (
+                                                <table className="min-w-full text-xs">
+                                                    <thead>
+                                                        <tr className="text-gray-400 border-b border-gray-200">
+                                                            <th className="py-2 text-left font-medium">Date</th>
+                                                            <th className="py-2 text-left font-medium">Notes</th>
+                                                            <th className="py-2 text-right font-medium">Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {expandedPayments.map((p, idx) => (
+                                                            <tr key={idx} className="border-b border-gray-100 last:border-0">
+                                                                <td className="py-2 text-gray-600">{p.date}</td>
+                                                                <td className="py-2 text-gray-500 italic">{p.notes || '-'}</td>
+                                                                <td className="py-2 text-right font-semibold text-gray-700">৳ {p.amount.toLocaleString()}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </React.Fragment>
+                    ))}
+                    {deliveries.length === 0 && (
+                        <tr><td colSpan={8} className="text-center py-8 text-gray-400">No deliveries found.</td></tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+      </div>
+
+      {/* New Delivery Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold">New Delivery Entry</h2>
+                    <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">×</button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Section 1: Customer */}
+                    <div className="space-y-4 border-b pb-4">
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase">Customer Details</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Name</label>
+                                <input type="text" required
+                                    value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Mobile</label>
+                                <input type="text"
+                                    value={formData.customer_mobile} onChange={e => setFormData({...formData, customer_mobile: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700">Address</label>
+                             <input type="text"
+                                value={formData.customer_address} onChange={e => setFormData({...formData, customer_address: e.target.value})}
+                                className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                             />
+                        </div>
+                    </div>
+
+                    {/* Section 2: Product */}
+                    <div className="space-y-4 border-b pb-4">
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase">Product Details</h3>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Bags</label>
+                                <input type="number" required
+                                    value={formData.number_of_bags} onChange={e => setFormData({...formData, number_of_bags: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Price/Bag</label>
+                                <input type="number" required
+                                    value={formData.price_per_bag} onChange={e => setFormData({...formData, price_per_bag: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Customer Paid (Initial)</label>
+                                <input type="number" required
+                                    value={formData.product_paid_amount} onChange={e => setFormData({...formData, product_paid_amount: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                        </div>
+                        <div className="bg-green-50 p-2 rounded text-center text-sm">
+                            Total: ৳ {(Number(formData.number_of_bags) * Number(formData.price_per_bag)).toLocaleString()} | 
+                            Due: <span className="text-red-500">৳ {((Number(formData.number_of_bags) * Number(formData.price_per_bag)) - Number(formData.product_paid_amount)).toLocaleString()}</span>
+                        </div>
+                    </div>
+
+                    {/* Section 3: Driver */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase">Transport / Driver</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Driver Name</label>
+                                <input type="text"
+                                    value={formData.driver_name} onChange={e => setFormData({...formData, driver_name: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Truck No</label>
+                                <input type="text"
+                                    value={formData.truck_number} onChange={e => setFormData({...formData, truck_number: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Product Name</label>
+                            <input type="text"
+                                value={formData.product_name} onChange={e => setFormData({...formData, product_name: e.target.value})}
+                                className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                placeholder="e.g., Rice, Wheat, etc."
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Driver Payment</label>
+                                <input type="number"
+                                    value={formData.driver_payment_amount} onChange={e => setFormData({...formData, driver_payment_amount: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Extra Cost</label>
+                                <input type="number"
+                                    value={formData.driver_extra_cost} onChange={e => setFormData({...formData, driver_extra_cost: e.target.value})}
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold"
+                    >
+                        {loading ? 'Processing...' : 'Complete Delivery Entry'}
+                    </button>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedDelivery && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                    <div>
+                        <h2 className="text-lg font-bold">Payment Details</h2>
+                        <p className="text-xs text-gray-500">Customer: {selectedDelivery.customer_name}</p>
+                    </div>
+                    <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
+                </div>
+
+                <div className="mb-6 space-y-2">
+                    <div className="flex justify-between text-sm">
+                        <span>Total Product Price:</span>
+                        <span className="font-semibold">৳ {selectedDelivery.total_product_price.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span>Total Received:</span>
+                        <span className="font-semibold text-green-600">৳ {selectedDelivery.product_paid_amount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span>Remaining Due:</span>
+                        <span className="font-semibold text-red-600">৳ {selectedDelivery.product_due_amount.toLocaleString()}</span>
+                    </div>
+                </div>
+
+                <div className="mb-6 max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-2">
+                    <h3 className="text-xs font-semibold text-gray-500 mb-2 uppercase">Payment History</h3>
+                    {paymentHistory.length === 0 ? (
+                        <p className="text-xs text-gray-400 text-center">No payment history recorded.</p>
+                    ) : (
+                        <table className="w-full text-xs">
+                             <thead>
+                                <tr className="border-b border-gray-200 text-gray-500">
+                                    <th className="py-1 text-left font-medium">Date</th>
+                                    <th className="py-1 text-left font-medium">Notes</th>
+                                    <th className="py-1 text-right font-medium">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paymentHistory.map((p, idx) => (
+                                    <tr key={idx} className="border-b last:border-0 border-gray-200">
+                                        <td className="py-1.5 text-gray-500">{p.date}</td>
+                                        <td className="py-1.5 text-gray-500 italic max-w-[100px] truncate">{p.notes || '-'}</td>
+                                        <td className="py-1.5 text-right font-medium">৳ {p.amount.toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                <form onSubmit={handleAddPayment} className="bg-green-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-green-900 mb-3">Receive Payment</h3>
+                    <div className="space-y-3">
+                        <input 
+                            type="date" required
+                            value={newPaymentDate}
+                            onChange={e => setNewPaymentDate(e.target.value)}
+                            className="w-full text-sm p-2 rounded border border-green-200"
+                        />
+                        <input 
+                            type="text" 
+                            placeholder="Notes (e.g. Bank Transfer, Cash)"
+                            value={newPaymentNotes}
+                            onChange={e => setNewPaymentNotes(e.target.value)}
+                            className="w-full text-sm p-2 rounded border border-green-200"
+                        />
+                        <input 
+                            type="number" required min="1"
+                            placeholder="Amount (৳)"
+                            value={newPaymentAmount}
+                            onChange={e => setNewPaymentAmount(e.target.value)}
+                            className="w-full text-sm p-2 rounded border border-green-200"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={loading || selectedDelivery.product_due_amount <= 0}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 rounded transition disabled:opacity-50"
+                        >
+                            {loading ? 'Processing...' : 'Record Payment'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+          </div>
+      )}
+    </div>
+  );
+};
+
+export default Deliveries;

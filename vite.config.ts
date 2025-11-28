@@ -4,8 +4,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    // Determine base URL based on build mode
+    const isProduction = mode === 'production';
+    const base = isProduction ? '/factory-management/' : '/';
+    
     return {
-      base: process.env.GITHUB_PAGES ? '/factory-management/' : '/',
+      base,
       server: {
         port: 3000,
         host: '0.0.0.0',

@@ -8,18 +8,12 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Create client even if credentials are missing (they'll be checked at runtime)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Warn if credentials are missing
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   if (typeof window !== 'undefined') {
     console.warn(
-      'Missing Supabase credentials. Please:\n' +
-      '1. Copy .env.local.example to .env.local\n' +
-      '2. Fill in your SUPABASE_URL and SUPABASE_ANON_KEY\n' +
-      '3. Restart the development server\n' +
-      'See DATABASE_SETUP_GUIDE.md for complete instructions.'
+      'Missing Supabase credentials. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY'
     );
   }
 }

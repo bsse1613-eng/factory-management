@@ -19,6 +19,8 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: { hasError: boolean; error: any; };
+  props: any;
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -54,6 +56,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     }
 
     return this.props.children;
+  }
+  setState(arg0: { hasError: boolean; error: null; }) {
+    throw new Error('Method not implemented.');
   }
 }
 

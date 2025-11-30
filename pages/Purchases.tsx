@@ -49,6 +49,7 @@ const Purchases: React.FC<Props> = ({ userProfile }) => {
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
+    branch: userProfile.branch || 'Bogura',
     supplier_name: '',
     source_location: '',
     product_name: '',
@@ -173,7 +174,7 @@ const Purchases: React.FC<Props> = ({ userProfile }) => {
             id: `demo-p-${Date.now()}`,
             created_at: new Date().toISOString(),
             date: formData.date,
-            branch: userProfile.branch || 'Bogura',
+            branch: formData.branch,
             supplier_name: formData.supplier_name,
             source_location: formData.source_location,
             product_name: formData.product_name,
@@ -189,6 +190,7 @@ const Purchases: React.FC<Props> = ({ userProfile }) => {
         setShowModal(false);
         setFormData({
             date: new Date().toISOString().split('T')[0],
+            branch: userProfile.branch || 'Bogura',
             supplier_name: '',
             source_location: '',
             product_name: '',
@@ -203,7 +205,7 @@ const Purchases: React.FC<Props> = ({ userProfile }) => {
 
     const { data: purchaseData, error: purchaseError } = await supabase.from('purchases').insert([{
         date: formData.date,
-        branch: userProfile.branch || 'Bogura',
+        branch: formData.branch,
         supplier_name: formData.supplier_name,
         source_location: formData.source_location,
         product_name: formData.product_name,
@@ -228,6 +230,7 @@ const Purchases: React.FC<Props> = ({ userProfile }) => {
         setShowModal(false);
         setFormData({
             date: new Date().toISOString().split('T')[0],
+            branch: userProfile.branch || 'Bogura',
             supplier_name: '',
             source_location: '',
             product_name: '',
@@ -487,12 +490,17 @@ const Purchases: React.FC<Props> = ({ userProfile }) => {
                             />
                         </div>
                          <div>
-                            <label className="block text-sm font-medium text-gray-700">Branch</label>
-                            <input 
-                                type="text" disabled 
-                                value={userProfile.branch || 'Select (Owner)'}
-                                className="mt-1 block w-full bg-gray-100 rounded-md border-gray-300 shadow-sm border p-2"
-                            />
+                            <label className="block text-sm font-medium text-gray-700">Branch *</label>
+                            <select 
+                                required
+                                value={formData.branch}
+                                onChange={e => setFormData({...formData, branch: e.target.value})}
+                                className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">Select Branch</option>
+                                <option value="Bogura">Bogura</option>
+                                <option value="Santahar">Santahar</option>
+                            </select>
                         </div>
                     </div>
                     <div>

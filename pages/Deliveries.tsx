@@ -50,6 +50,7 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
   // Form State
   const [formData, setFormData] = useState({
     delivery_date: new Date().toISOString().split('T')[0],
+    branch: userProfile.branch || 'Bogura',
     customer_name: '',
     customer_address: '',
     customer_mobile: '',
@@ -75,7 +76,6 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
       return;
     }
 
-    // All users (both owners and employees) see ALL customers from all branches
     const { data, error } = await supabase
       .from('customers')
       .select('*')
@@ -181,7 +181,7 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
             id: `demo-d-${Date.now()}`,
             created_at: new Date().toISOString(),
             delivery_date: formData.delivery_date,
-            branch: userProfile.branch || 'Bogura',
+            branch: formData.branch,
             customer_name: formData.customer_name,
             customer_address: formData.customer_address,
             customer_mobile: formData.customer_mobile,
@@ -202,6 +202,7 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
         setShowModal(false);
         setFormData({
             delivery_date: new Date().toISOString().split('T')[0],
+            branch: userProfile.branch || 'Bogura',
             customer_name: '',
             customer_address: '',
             customer_mobile: '',
@@ -221,7 +222,7 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
 
     const { data, error } = await supabase.from('deliveries').insert([{
         delivery_date: formData.delivery_date,
-        branch: userProfile.branch || 'Bogura', 
+        branch: formData.branch,
         customer_name: formData.customer_name,
         customer_address: formData.customer_address,
         customer_mobile: formData.customer_mobile,
@@ -506,6 +507,21 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
                     <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">×</button>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Section 0: Branch Selection */}
+                    <div className="space-y-2 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-700 uppercase">Branch Selection</h3>
+                        <select 
+                            required
+                            value={formData.branch}
+                            onChange={e => setFormData({...formData, branch: e.target.value})}
+                            className="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                        >
+                            <option value="">-- Select Branch --</option>
+                            <option value="Bogura">🔵 Bogura Branch</option>
+                            <option value="Santahar">🟣 Santahar Branch</option>
+                        </select>
+                    </div>
+
                     {/* Section 1: Customer */}
                     <div className="space-y-4 border-b pb-4">
                         <h3 className="text-sm font-semibold text-gray-500 uppercase">Customer Details</h3>

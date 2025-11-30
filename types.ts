@@ -9,6 +9,30 @@ export interface Profile {
   full_name?: string;
 }
 
+export interface Supplier {
+  id: string;
+  created_at: string;
+  branch: Branch;
+  supplier_name: string;
+  contact_person?: string;
+  source_location: string;
+  mobile_number: string;
+  email?: string;
+  notes?: string;
+}
+
+export interface Customer {
+  id: string;
+  created_at: string;
+  branch: Branch;
+  customer_name: string;
+  contact_person?: string;
+  customer_address: string;
+  customer_mobile: string;
+  email?: string;
+  notes?: string;
+}
+
 export interface Purchase {
   id: string;
   created_at: string;

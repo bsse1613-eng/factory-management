@@ -56,7 +56,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin, onDemoLogin }) => {
           <div className="bg-blue-100 p-3 rounded-full mb-4">
             <Factory className="h-8 w-8 text-blue-700" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Factory Login</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Alankar Agro</h1>
           <p className="text-gray-500 text-sm">Sign in to manage your branch</p>
         </div>
 

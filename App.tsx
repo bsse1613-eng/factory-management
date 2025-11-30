@@ -5,6 +5,10 @@ import { Profile } from './types';
 import Auth from './components/Auth';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
+import Suppliers from './pages/Suppliers';
+import Customers from './pages/Customers';
+import SupplierProfile from './pages/SupplierProfile';
+import CustomerProfile from './pages/CustomerProfile';
 import Purchases from './pages/Purchases';
 import Deliveries from './pages/Deliveries';
 import Expenses from './pages/Expenses';
@@ -228,6 +232,10 @@ const App: React.FC = () => {
         <Layout userProfile={userProfile}>
           <Routes>
             <Route path="/" element={<Dashboard userProfile={userProfile} />} />
+            <Route path="/suppliers" element={<Suppliers userProfile={userProfile} />} />
+            <Route path="/suppliers/:supplierId" element={<SupplierProfile userProfile={userProfile} />} />
+            <Route path="/customers" element={<Customers userProfile={userProfile} />} />
+            <Route path="/customers/:customerId" element={<CustomerProfile userProfile={userProfile} />} />
             <Route path="/purchases" element={<Purchases userProfile={userProfile} />} />
             <Route path="/deliveries" element={<Deliveries userProfile={userProfile} />} />
             <Route path="/expenses" element={<Expenses userProfile={userProfile} />} />

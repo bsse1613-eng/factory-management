@@ -29,6 +29,8 @@ const Layout: React.FC<LayoutProps> = ({ children, userProfile }) => {
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Suppliers', path: '/suppliers', icon: Package },
+    { name: 'Customers', path: '/customers', icon: Truck },
     { name: 'Purchases (Raw Material)', path: '/purchases', icon: Package },
     { name: 'Sales & Delivery', path: '/deliveries', icon: Truck },
     { name: 'Expenses', path: '/expenses', icon: DollarSign },
@@ -101,7 +103,7 @@ const Layout: React.FC<LayoutProps> = ({ children, userProfile }) => {
             <button onClick={() => setSidebarOpen(true)} className="text-gray-600">
                 <Menu size={24} />
             </button>
-            <span className="font-semibold text-gray-800">Factory Manager</span>
+            <span className="font-semibold text-gray-800">Alankar agro</span>
             <div className="w-6"></div> {/* Spacer */}
         </header>
 

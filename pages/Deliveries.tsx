@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
-import { Profile, Delivery, DeliveryPayment } from '../types';
+import { Profile, Delivery, DeliveryPayment, Customer } from '../types';
 import { Plus, Printer, Wallet, X, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { generateDeliveryPDF, printDeliveryPDF } from '../services/pdfService';
-import { mockDeliveries, mockDeliveryPayments } from '../services/mockData';
+import { mockDeliveries, mockDeliveryPayments, mockCustomers } from '../services/mockData';
 
 // Branch color scheme
 const getBranchColor = (branch?: string) => {
@@ -29,8 +29,10 @@ interface Props {
 
 const Deliveries: React.FC<Props> = ({ userProfile }) => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
 
   // Expandable Row State
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -64,7 +66,23 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
 
   useEffect(() => {
     fetchDeliveries();
+    fetchCustomers();
   }, [userProfile]);
+
+  const fetchCustomers = async () => {
+    if (userProfile.id === 'demo') {
+      setCustomers(mockCustomers);
+      return;
+    }
+
+    // All users (both owners and employees) see ALL customers from all branches
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('customer_name', { ascending: true });
+
+    if (!error && data) setCustomers(data as unknown as Customer[]);
+  };
 
   const fetchDeliveries = async () => {
     if (userProfile.id === 'demo') {
@@ -493,11 +511,48 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
                         <h3 className="text-sm font-semibold text-gray-500 uppercase">Customer Details</h3>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Name</label>
-                                <input type="text" required
-                                    value={formData.customer_name} onChange={e => setFormData({...formData, customer_name: e.target.value})}
-                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
-                                />
+                                <label className="block text-sm font-medium text-gray-700">Customer Name *</label>
+                                <div className="relative mt-1">
+                                    <input 
+                                        type="text"
+                                        required
+                                        placeholder="Search or select customer..."
+                                        value={formData.customer_name}
+                                        onChange={(e) => {
+                                            setFormData({...formData, customer_name: e.target.value});
+                                            setCustomerDropdownOpen(true);
+                                        }}
+                                        onFocus={() => setCustomerDropdownOpen(true)}
+                                        className="w-full border border-gray-300 rounded-md p-2 focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {customerDropdownOpen && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                                            {customers
+                                                .filter(c => c.customer_name.toLowerCase().includes(formData.customer_name.toLowerCase()))
+                                                .map(customer => (
+                                                    <div
+                                                        key={customer.id}
+                                                        onClick={() => {
+                                                            setFormData({
+                                                                ...formData,
+                                                                customer_name: customer.customer_name,
+                                                                customer_address: customer.customer_address,
+                                                                customer_mobile: customer.customer_mobile
+                                                            });
+                                                            setCustomerDropdownOpen(false);
+                                                        }}
+                                                        className="px-4 py-2 hover:bg-green-50 cursor-pointer border-b last:border-b-0"
+                                                    >
+                                                        <div className="font-medium text-gray-900">{customer.customer_name}</div>
+                                                        <div className="text-xs text-gray-500">{customer.customer_address} • {customer.customer_mobile}</div>
+                                                    </div>
+                                                ))}
+                                            {customers.filter(c => c.customer_name.toLowerCase().includes(formData.customer_name.toLowerCase())).length === 0 && (
+                                                <div className="px-4 py-2 text-gray-500 text-sm">No customers found</div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Mobile</label>
@@ -605,93 +660,150 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
         </div>
       )}
 
-      {/* Payment Modal */}
+      {/* Payment Modal - Clean & User-Friendly */}
       {showPaymentModal && selectedDelivery && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-                <div className="flex justify-between items-center mb-4 border-b pb-2">
-                    <div>
-                        <h2 className="text-lg font-bold">Payment Details</h2>
-                        <p className="text-xs text-gray-500">Customer: {selectedDelivery.customer_name}</p>
-                    </div>
-                    <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
-                </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-6 flex justify-between items-center">
+              <div className="text-white">
+                <h2 className="text-2xl font-bold">Payment Management</h2>
+                <p className="text-green-100 text-sm mt-1">Customer: {selectedDelivery.customer_name}</p>
+              </div>
+              <button 
+                onClick={() => setShowPaymentModal(false)} 
+                className="text-white hover:bg-green-800 p-2 rounded-lg transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
 
-                <div className="mb-6 space-y-2">
-                    <div className="flex justify-between text-sm">
-                        <span>Total Product Price:</span>
-                        <span className="font-semibold">৳ {selectedDelivery.total_product_price.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span>Total Received:</span>
-                        <span className="font-semibold text-green-600">৳ {selectedDelivery.product_paid_amount.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span>Remaining Due:</span>
-                        <span className="font-semibold text-red-600">৳ {selectedDelivery.product_due_amount.toLocaleString()}</span>
-                    </div>
+            <div className="p-6 space-y-6">
+              {/* Financial Summary Cards */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-600 font-semibold uppercase mb-1">Total Amount</p>
+                  <p className="text-2xl font-bold text-blue-700">৳ {selectedDelivery.total_product_price.toLocaleString()}</p>
                 </div>
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <p className="text-xs text-green-600 font-semibold uppercase mb-1">Received</p>
+                  <p className="text-2xl font-bold text-green-700">৳ {selectedDelivery.product_paid_amount.toLocaleString()}</p>
+                </div>
+                <div className={`${selectedDelivery.product_due_amount > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'} p-4 rounded-lg border`}>
+                  <p className={`text-xs font-semibold uppercase mb-1 ${selectedDelivery.product_due_amount > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {selectedDelivery.product_due_amount > 0 ? 'Remaining Due' : 'Fully Paid'}
+                  </p>
+                  <p className={`text-2xl font-bold ${selectedDelivery.product_due_amount > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                    ৳ {selectedDelivery.product_due_amount.toLocaleString()}
+                  </p>
+                </div>
+              </div>
 
-                <div className="mb-6 max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-2">
-                    <h3 className="text-xs font-semibold text-gray-500 mb-2 uppercase">Payment History</h3>
+              <hr className="border-gray-200" />
+
+              {/* Two Column Layout */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left: Payment History */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
+                  <div className="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto border border-gray-200">
                     {paymentHistory.length === 0 ? (
-                        <p className="text-xs text-gray-400 text-center">No payment history recorded.</p>
+                      <div className="text-center py-12">
+                        <p className="text-gray-500 text-sm">No payments recorded yet</p>
+                      </div>
                     ) : (
-                        <table className="w-full text-xs">
-                             <thead>
-                                <tr className="border-b border-gray-200 text-gray-500">
-                                    <th className="py-1 text-left font-medium">Date</th>
-                                    <th className="py-1 text-left font-medium">Notes</th>
-                                    <th className="py-1 text-right font-medium">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paymentHistory.map((p, idx) => (
-                                    <tr key={idx} className="border-b last:border-0 border-gray-200">
-                                        <td className="py-1.5 text-gray-500">{p.date}</td>
-                                        <td className="py-1.5 text-gray-500 italic max-w-[100px] truncate">{p.notes || '-'}</td>
-                                        <td className="py-1.5 text-right font-medium">৳ {p.amount.toLocaleString()}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                      <div className="space-y-3">
+                        {paymentHistory.map((p, idx) => (
+                          <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 hover:shadow-sm transition">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <p className="text-xs text-gray-500 font-medium">{p.date}</p>
+                                <p className="text-sm text-gray-700 mt-1">{p.notes || '(No notes)'}</p>
+                              </div>
+                              <p className="text-lg font-bold text-green-600 ml-4">৳ {p.amount.toLocaleString()}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
+                  </div>
                 </div>
 
-                <form onSubmit={handleAddPayment} className="bg-green-50 p-4 rounded-lg">
-                    <h3 className="text-sm font-semibold text-green-900 mb-3">Receive Payment</h3>
-                    <div className="space-y-3">
-                        <input 
-                            type="date" required
-                            value={newPaymentDate}
-                            onChange={e => setNewPaymentDate(e.target.value)}
-                            className="w-full text-sm p-2 rounded border border-green-200"
-                        />
-                        <input 
-                            type="text" 
-                            placeholder="Notes (e.g. Bank Transfer, Cash)"
-                            value={newPaymentNotes}
-                            onChange={e => setNewPaymentNotes(e.target.value)}
-                            className="w-full text-sm p-2 rounded border border-green-200"
-                        />
-                        <input 
-                            type="number" required min="1"
-                            placeholder="Amount (৳)"
-                            value={newPaymentAmount}
-                            onChange={e => setNewPaymentAmount(e.target.value)}
-                            className="w-full text-sm p-2 rounded border border-green-200"
-                        />
-                        <button 
-                            type="submit"
-                            disabled={loading || selectedDelivery.product_due_amount <= 0}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 rounded transition disabled:opacity-50"
-                        >
-                            {loading ? 'Processing...' : 'Record Payment'}
-                        </button>
+                {/* Right: Add New Payment */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Receive Payment</h3>
+                  <form onSubmit={handleAddPayment} className="space-y-4">
+                    {/* Payment Date */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Payment Date *</label>
+                      <input 
+                        type="date" 
+                        required
+                        value={newPaymentDate}
+                        onChange={(e) => setNewPaymentDate(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                      />
                     </div>
-                </form>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Amount (৳) *</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-3 text-gray-500 font-medium">৳</span>
+                        <input 
+                          type="number" 
+                          required 
+                          min="1"
+                          value={newPaymentAmount}
+                          onChange={(e) => setNewPaymentAmount(e.target.value)}
+                          placeholder="Enter amount"
+                          className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                        />
+                      </div>
+                      {newPaymentAmount && parseInt(newPaymentAmount) > selectedDelivery.product_due_amount && (
+                        <p className="text-xs text-amber-600 mt-2">⚠ Amount exceeds due amount by ৳ {(parseInt(newPaymentAmount) - selectedDelivery.product_due_amount).toLocaleString()}</p>
+                      )}
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method / Notes</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g., Bank Transfer, Cash, Cheque"
+                        value={newPaymentNotes}
+                        onChange={(e) => setNewPaymentNotes(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button 
+                      type="submit"
+                      disabled={loading || selectedDelivery.product_due_amount <= 0 || !newPaymentAmount}
+                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-3 px-4 rounded-lg transition mt-6"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Processing...
+                        </span>
+                      ) : (
+                        'Record Payment'
+                      )}
+                    </button>
+
+                    {selectedDelivery.product_due_amount <= 0 && (
+                      <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
+                        <p className="text-sm text-emerald-700 font-medium">✓ This delivery is fully paid!</p>
+                      </div>
+                    )}
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
       )}
     </div>
   );

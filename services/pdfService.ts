@@ -172,7 +172,6 @@ const generatePurchasePDFDoc = (data: Purchase, payments: PurchasePayment[] = []
     finalY = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // Financial Summary Box with gradient effect
   doc.setFillColor(...colors.darkGray);
   doc.roundedRect(14, finalY - 3, 182, 8, 2, 2, 'F');
   

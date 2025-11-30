@@ -1,4 +1,4 @@
-import { Purchase, Delivery, Expense, PurchasePayment, DeliveryPayment } from '../types';
+import { Purchase, Delivery, Expense, PurchasePayment, DeliveryPayment, Supplier, Customer } from '../types';
 
 export const mockPurchases: Purchase[] = [
   {
@@ -119,5 +119,55 @@ export const mockExpenses: Expense[] = [
     quantity: 5,
     total_cost: 1200,
     notes: 'For packaging'
+  }
+];
+
+export const mockSuppliers: Supplier[] = [
+  {
+    id: 'supp-1',
+    created_at: new Date().toISOString(),
+    branch: 'Bogura',
+    supplier_name: 'Rahim Traders',
+    contact_person: 'Rahim Ahmed',
+    source_location: 'Dhaka',
+    mobile_number: '01711234567',
+    email: 'rahim@traders.com',
+    notes: 'Regular supplier of Raw Jute'
+  },
+  {
+    id: 'supp-2',
+    created_at: new Date().toISOString(),
+    branch: 'Santahar',
+    supplier_name: 'Karim Enterprise',
+    contact_person: 'Karim Hossain',
+    source_location: 'Naogaon',
+    mobile_number: '01998765432',
+    email: 'karim@enterprise.com',
+    notes: 'Cotton Fiber supplier'
+  }
+];
+
+export const mockCustomers: Customer[] = [
+  {
+    id: 'cust-1',
+    created_at: new Date().toISOString(),
+    branch: 'Bogura',
+    customer_name: 'Jamuna Mills',
+    contact_person: 'Jamuna Roy',
+    customer_address: 'Sirajganj',
+    customer_mobile: '01711000000',
+    email: 'jamuna@mills.com',
+    notes: 'Large regular buyer of processed jute'
+  },
+  {
+    id: 'cust-2',
+    created_at: new Date().toISOString(),
+    branch: 'Santahar',
+    customer_name: 'Local Wholesaler',
+    contact_person: 'Shakib Ali',
+    customer_address: 'Bogra Bazar',
+    customer_mobile: '01999888777',
+    email: 'shakib@wholesale.com',
+    notes: 'Local distribution partner'
   }
 ];

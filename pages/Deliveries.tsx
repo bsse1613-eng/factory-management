@@ -3,7 +3,7 @@ import { supabase } from '../services/supabaseClient';
 import { Profile, Delivery, DeliveryPayment, Customer } from '../types';
 import { Plus, Printer, Wallet, X, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { generateDeliveryPDF, printDeliveryPDF } from '../services/pdfService';
-import { mockDeliveries, mockDeliveryPayments, mockCustomers } from '../services/mockData';
+import { mockDeliveries, mockDeliveryPayments, mockCustomers, mockTrucks } from '../services/mockData';
 
 // Branch color scheme
 const getBranchColor = (branch?: string) => {
@@ -27,12 +27,26 @@ interface Props {
   userProfile: Profile;
 }
 
+interface Truck {
+  id: string;
+  truck_number: string;
+  driver_name: string;
+  driver_license: string;
+  driver_mobile: string;
+  vehicle_type: string;
+  capacity: number;
+  notes?: string;
+  created_at: string;
+}
+
 const Deliveries: React.FC<Props> = ({ userProfile }) => {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [trucks, setTrucks] = useState<Truck[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [truckDropdownOpen, setTruckDropdownOpen] = useState(false);
 
   // Expandable Row State
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -68,6 +82,7 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
   useEffect(() => {
     fetchDeliveries();
     fetchCustomers();
+    fetchTrucks();
   }, [userProfile]);
 
   const fetchCustomers = async () => {
@@ -82,6 +97,20 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
       .order('customer_name', { ascending: true });
 
     if (!error && data) setCustomers(data as unknown as Customer[]);
+  };
+
+  const fetchTrucks = async () => {
+    if (userProfile.id === 'demo') {
+      setTrucks(mockTrucks);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('trucks')
+      .select('*')
+      .order('truck_number', { ascending: true });
+
+    if (!error && data) setTrucks(data as unknown as Truck[]);
   };
 
   const fetchDeliveries = async () => {
@@ -624,17 +653,62 @@ const Deliveries: React.FC<Props> = ({ userProfile }) => {
                         <h3 className="text-sm font-semibold text-gray-500 uppercase">Transport / Driver</h3>
                         <div className="grid grid-cols-2 gap-4">
                              <div>
-                                <label className="block text-sm font-medium text-gray-700">Driver Name</label>
-                                <input type="text"
-                                    value={formData.driver_name} onChange={e => setFormData({...formData, driver_name: e.target.value})}
-                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
-                                />
+                                <label className="block text-sm font-medium text-gray-700">Truck / Driver *</label>
+                                <div className="relative mt-1">
+                                    <input 
+                                        type="text"
+                                        placeholder="Search truck or driver..."
+                                        value={formData.truck_number}
+                                        onChange={(e) => {
+                                            setFormData({...formData, truck_number: e.target.value});
+                                            setTruckDropdownOpen(true);
+                                        }}
+                                        onFocus={() => setTruckDropdownOpen(true)}
+                                        className="w-full border border-gray-300 rounded-md p-2 focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {truckDropdownOpen && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                                            {trucks
+                                                .filter(t => 
+                                                    t.truck_number.toLowerCase().includes(formData.truck_number.toLowerCase()) ||
+                                                    t.driver_name.toLowerCase().includes(formData.truck_number.toLowerCase())
+                                                )
+                                                .map(truck => (
+                                                    <div
+                                                        key={truck.id}
+                                                        onClick={() => {
+                                                            setFormData({
+                                                                ...formData,
+                                                                truck_number: truck.truck_number,
+                                                                driver_name: truck.driver_name
+                                                            });
+                                                            setTruckDropdownOpen(false);
+                                                        }}
+                                                        className="px-4 py-2 hover:bg-green-50 cursor-pointer border-b last:border-b-0"
+                                                    >
+                                                        <div className="font-medium text-gray-900">{truck.truck_number}</div>
+                                                        <div className="text-xs text-gray-500">Driver: {truck.driver_name} • {truck.driver_mobile}</div>
+                                                    </div>
+                                                ))}
+                                            {trucks.filter(t => 
+                                                t.truck_number.toLowerCase().includes(formData.truck_number.toLowerCase()) ||
+                                                t.driver_name.toLowerCase().includes(formData.truck_number.toLowerCase())
+                                            ).length === 0 && (
+                                                <div className="px-4 py-2 text-gray-500 text-sm">
+                                                    {trucks.length === 0 ? 'No trucks registered' : 'No matching trucks found'}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Truck No</label>
+                                <label className="block text-sm font-medium text-gray-700">Driver Name (Auto-filled)</label>
                                 <input type="text"
-                                    value={formData.truck_number} onChange={e => setFormData({...formData, truck_number: e.target.value})}
-                                    className="mt-1 w-full border border-gray-300 rounded-md p-2"
+                                    value={formData.driver_name} 
+                                    readOnly
+                                    placeholder="Select truck above"
+                                    className="mt-1 w-full border border-gray-300 rounded-md p-2 bg-gray-50 text-gray-600"
                                 />
                             </div>
                         </div>

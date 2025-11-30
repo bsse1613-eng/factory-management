@@ -171,3 +171,39 @@ export const mockCustomers: Customer[] = [
     notes: 'Local distribution partner'
   }
 ];
+
+export const mockTrucks = [
+  {
+    id: 'truck-1',
+    truck_number: 'DH-12-A-1234',
+    driver_name: 'Mohammed Rahman',
+    driver_license: 'LIC-2024-001',
+    driver_mobile: '01712345678',
+    vehicle_type: 'Truck',
+    capacity: 500,
+    notes: 'Well maintained, AC working',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'truck-2',
+    truck_number: 'DH-12-B-5678',
+    driver_name: 'Ahmed Khan',
+    driver_license: 'LIC-2024-002',
+    driver_mobile: '01798765432',
+    vehicle_type: 'Lorry',
+    capacity: 300,
+    notes: 'Suitable for short routes',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'truck-3',
+    truck_number: 'DH-12-C-9012',
+    driver_name: 'Karim Mia',
+    driver_license: 'LIC-2024-003',
+    driver_mobile: '01654321098',
+    vehicle_type: 'Van',
+    capacity: 200,
+    notes: 'Good condition',
+    created_at: new Date().toISOString()
+  }
+];

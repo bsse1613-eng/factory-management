@@ -33,6 +33,7 @@ const Layout: React.FC<LayoutProps> = ({ children, userProfile }) => {
     { name: 'Customers', path: '/customers', icon: Truck },
     { name: 'Purchases (Raw Material)', path: '/purchases', icon: Package },
     { name: 'Sales & Delivery', path: '/deliveries', icon: Truck },
+    { name: 'Fleet Management', path: '/trucks', icon: Truck },
     { name: 'Expenses', path: '/expenses', icon: DollarSign },
   ];
 

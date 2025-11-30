@@ -12,6 +12,8 @@ import CustomerProfile from './pages/CustomerProfile';
 import Purchases from './pages/Purchases';
 import Deliveries from './pages/Deliveries';
 import Expenses from './pages/Expenses';
+import Trucks from './pages/Trucks';
+import TruckDetail from './pages/TruckDetail';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -239,6 +241,8 @@ const App: React.FC = () => {
             <Route path="/purchases" element={<Purchases userProfile={userProfile} />} />
             <Route path="/deliveries" element={<Deliveries userProfile={userProfile} />} />
             <Route path="/expenses" element={<Expenses userProfile={userProfile} />} />
+            <Route path="/trucks" element={<Trucks userProfile={userProfile} />} />
+            <Route path="/trucks/:truckId" element={<TruckDetail userProfile={userProfile} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>

@@ -1,4 +1,4 @@
-import { Purchase, Delivery, Expense, PurchasePayment, DeliveryPayment, Supplier, Customer } from '../types';
+import { Purchase, Delivery, Expense, PurchasePayment, DeliveryPayment, Supplier, Customer, TruckDriverPayment } from '../types';
 
 export const mockPurchases: Purchase[] = [
   {
@@ -205,5 +205,41 @@ export const mockTrucks = [
     capacity: 200,
     notes: 'Good condition',
     created_at: new Date().toISOString()
+  }
+];
+
+export const mockTruckDriverPayments: TruckDriverPayment[] = [
+  {
+    id: 'dpay-1',
+    truck_id: 'truck-1',
+    driver_name: 'Mohammed Rahman',
+    driver_mobile: '01712345678',
+    payment_date: new Date().toISOString().split('T')[0],
+    amount: 5000,
+    payment_type: 'regular',
+    notes: 'Payment for delivery to Sirajganj',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'dpay-2',
+    truck_id: 'truck-1',
+    driver_name: 'Mohammed Rahman',
+    driver_mobile: '01712345678',
+    payment_date: new Date().toISOString().split('T')[0],
+    amount: 500,
+    payment_type: 'demurrage',
+    notes: 'Extra charge for unloading delay',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'dpay-3',
+    truck_id: 'truck-2',
+    driver_name: 'Ahmed Khan',
+    driver_mobile: '01798765432',
+    payment_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+    amount: 3000,
+    payment_type: 'regular',
+    notes: 'Regular delivery payment',
+    created_at: new Date(Date.now() - 86400000).toISOString()
   }
 ];

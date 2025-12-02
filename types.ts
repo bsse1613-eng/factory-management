@@ -87,6 +87,18 @@ export interface DeliveryPayment {
   notes?: string;
 }
 
+export interface TruckDriverPayment {
+  id: string;
+  truck_id: string;
+  driver_name: string;
+  driver_mobile: string;
+  payment_date: string;
+  amount: number;
+  payment_type: 'regular' | 'demurrage' | 'advance';
+  notes?: string;
+  created_at: string;
+}
+
 export interface Expense {
   id: string;
   created_at: string;

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { Profile } from '../types';
-import { Plus, Trash2, Eye, Search, Edit2, X } from 'lucide-react';
-import { mockTrucks } from '../services/mockData';
+import { Profile, TruckDriverPayment } from '../types';
+import { Plus, Trash2, Eye, Search, Edit2, X, DollarSign } from 'lucide-react';
+import { mockTrucks, mockTruckDriverPayments } from '../services/mockData';
 
 interface Truck {
   id: string;
@@ -28,6 +28,13 @@ const Trucks: React.FC<Props> = ({ userProfile }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDemurrageModal, setShowDemurrageModal] = useState(false);
+  const [selectedTruckForDemurrage, setSelectedTruckForDemurrage] = useState<Truck | null>(null);
+  const [demurrageForm, setDemurrageForm] = useState({
+    amount: '',
+    payment_date: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
 
   const [formData, setFormData] = useState({
     truck_number: '',
@@ -168,7 +175,6 @@ const Trucks: React.FC<Props> = ({ userProfile }) => {
     });
     setShowModal(true);
   };
-
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this truck?')) return;
 
@@ -187,6 +193,59 @@ const Trucks: React.FC<Props> = ({ userProfile }) => {
           alert('Error deleting truck: ' + error.message);
         }
       }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const handleAddDemurrage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTruckForDemurrage || !demurrageForm.amount) return;
+
+    try {
+      if (userProfile.id === 'demo') {
+        const newPayment: TruckDriverPayment = {
+          id: `dpay-${Date.now()}`,
+          truck_id: selectedTruckForDemurrage.id,
+          driver_name: selectedTruckForDemurrage.driver_name,
+          driver_mobile: selectedTruckForDemurrage.driver_mobile,
+          payment_date: demurrageForm.payment_date,
+          amount: Number(demurrageForm.amount),
+          payment_type: 'demurrage',
+          notes: demurrageForm.notes,
+          created_at: new Date().toISOString()
+        };
+        // In demo mode, we just show success
+        alert('Truck Demurrage Cost added successfully!');
+      } else {
+        const { error } = await supabase
+          .from('truck_driver_payments')
+          .insert([{
+            truck_id: selectedTruckForDemurrage.id,
+            driver_name: selectedTruckForDemurrage.driver_name,
+            driver_mobile: selectedTruckForDemurrage.driver_mobile,
+            payment_date: demurrageForm.payment_date,
+            amount: Number(demurrageForm.amount),
+            payment_type: 'demurrage',
+            notes: demurrageForm.notes
+          }])
+          .select()
+          .single();
+
+        if (!error) {
+          alert('Truck Demurrage Cost added successfully!');
+        } else {
+          alert('Error adding demurrage cost: ' + error?.message);
+        }
+      }
+
+      setDemurrageForm({
+        amount: '',
+        payment_date: new Date().toISOString().split('T')[0],
+        notes: ''
+      });
+      setSelectedTruckForDemurrage(null);
+      setShowDemurrageModal(false);
     } catch (error) {
       console.error('Error:', error);
     }
@@ -323,16 +382,26 @@ const Trucks: React.FC<Props> = ({ userProfile }) => {
                     <p className="text-gray-600 text-sm">{truck.notes}</p>
                   </div>
                 )}
-              </div>
-
-              {/* Actions */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
+              </div>              {/* Actions */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-2 flex-wrap">
                 <button
                   onClick={() => navigate(`/trucks/${truck.id}`)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                  className="flex-1 min-w-fit flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
                 >
                   <Eye size={16} /> View Details
                 </button>
+                {userProfile.role === 'owner' && (
+                  <button
+                    onClick={() => {
+                      setSelectedTruckForDemurrage(truck);
+                      setShowDemurrageModal(true);
+                    }}
+                    className="flex items-center justify-center gap-2 bg-orange-100 text-orange-700 px-3 py-2 rounded-lg hover:bg-orange-200 transition"
+                    title="Add Truck Demurrage Cost"
+                  >
+                    <DollarSign size={16} />
+                  </button>
+                )}
                 <button
                   onClick={() => handleEdit(truck)}
                   className="flex items-center justify-center gap-2 bg-yellow-100 text-yellow-700 px-3 py-2 rounded-lg hover:bg-yellow-200 transition"
@@ -497,6 +566,96 @@ const Trucks: React.FC<Props> = ({ userProfile }) => {
                   className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition"
                 >
                   {loading ? 'Saving...' : editingTruck ? 'Update Truck' : 'Add Truck'}
+                </button>
+              </div>            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Truck Demurrage Cost Modal */}
+      {showDemurrageModal && selectedTruckForDemurrage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-600 to-orange-700 px-6 py-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-white">Truck Demurrage Cost</h2>
+              <button
+                onClick={() => setShowDemurrageModal(false)}
+                className="text-white hover:bg-orange-800 p-2 rounded-lg transition"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAddDemurrage} className="p-6 space-y-4">
+              {/* Truck Info */}
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 mb-4">
+                <p className="text-sm text-gray-600 font-semibold uppercase mb-1">Truck</p>
+                <p className="text-lg font-bold text-gray-900">{selectedTruckForDemurrage.truck_number}</p>
+                <p className="text-sm text-gray-700 mt-1">Driver: {selectedTruckForDemurrage.driver_name}</p>
+                <p className="text-sm text-gray-700">Phone: {selectedTruckForDemurrage.driver_mobile}</p>
+              </div>
+
+              {/* Payment Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Payment Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={demurrageForm.payment_date}
+                  onChange={(e) => setDemurrageForm({ ...demurrageForm, payment_date: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Demurrage Amount (৳) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  step="0.01"
+                  value={demurrageForm.amount}
+                  onChange={(e) => setDemurrageForm({ ...demurrageForm, amount: e.target.value })}
+                  placeholder="e.g., 500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={demurrageForm.notes}
+                  onChange={(e) => setDemurrageForm({ ...demurrageForm, notes: e.target.value })}
+                  placeholder="e.g., Unloading delay at warehouse, 2 hours waiting charge"
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none resize-none"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowDemurrageModal(false)}
+                  className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition"
+                >
+                  Add Cost
                 </button>
               </div>
             </form>
